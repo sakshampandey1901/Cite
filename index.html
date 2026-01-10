@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cite</title>
+  <link rel="stylesheet" href="./src/style.css">
+  <link rel="stylesheet" href="./src/styles/layout.css">
+  <link rel="stylesheet" href="./src/styles/components.css">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap">
+</head>
+
+<body>
+  <div id="app" class="app-container">
+    <!-- Left: Knowledge Base -->
+    <aside class="region-left" id="region-left">
+      <div class="app-logo">Cite</div>
+      <header class="section-title">
+        <span>Sources</span>
+        <button id="btn-upload" style="font-size: 1.2rem; padding: 2px 8px;">+</button>
+      </header>
+      <div id="knowledge-base-list"></div>
+    </aside>
+
+    <!-- Center: Workspace -->
+    <main class="region-center">
+      <div class="workspace-header">
+        <div id="mode-selector" class="mode-selector-group"></div>
+      </div>
+      <div class="workspace-editor-container">
+        <div id="editor" class="editor-surface" contenteditable="true" placeholder="Start thinking..."></div>
+      </div>
+      <!-- Floating Action Button for 'Request Assistance' could go here or be part of mode selector -->
+      <div id="action-area" style="position: absolute; bottom: 20px; right: 20px;"></div>
+    </main>
+
+    <!-- Right: Output & Transparency -->
+    <aside class="region-right">
+      <section class="panel-output" id="panel-output">
+        <header class="section-title">Assistant Output</header>
+        <div id="output-content"></div>
+      </section>
+      <section class="panel-context" id="panel-context">
+        <header class="section-title">Context Sources</header>
+        <div id="context-list"></div>
+      </section>
+    </aside>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

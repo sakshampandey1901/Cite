@@ -1,0 +1,166 @@
+/* App Logo */
+.app-logo {
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: var(--space-lg);
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    padding-bottom: var(--space-md);
+    border-bottom: 2px solid var(--border-subtle);
+}
+
+/* file-item */
+.file-item {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-sm);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: var(--space-xs);
+    cursor: default;
+}
+
+.file-title {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.file-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.file-status {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.file-status.ready {
+    color: var(--status-ready);
+}
+
+.file-status.processing {
+    color: var(--status-processing);
+}
+
+/* Mode Selector */
+.mode-selector-group {
+    display: flex;
+    gap: var(--space-sm);
+    background: var(--bg-panel);
+    padding: 4px;
+    border-radius: 20px;
+    border: 1px solid var(--border-subtle);
+}
+
+.mode-btn {
+    background: transparent;
+    border: none;
+    font-size: 0.85rem;
+    padding: 6px 12px;
+    border-radius: 16px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-btn:hover {
+    background: var(--bg-app);
+    color: var(--text-primary);
+}
+
+.mode-btn.active {
+    background: var(--accent-mode);
+    color: white;
+    font-weight: 500;
+}
+
+/* Action Button */
+.btn-assist {
+    background: var(--accent-action);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-assist:hover {
+    background: #20558b;
+    /* Darker blue */
+    border-color: transparent;
+}
+
+.btn-assist:disabled {
+    background: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Output Content */
+.output-block {
+    margin-bottom: var(--space-lg);
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.output-header {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-mode);
+    margin-bottom: var(--space-sm);
+    text-transform: uppercase;
+}
+
+.output-actions {
+    margin-top: var(--space-sm);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-copy {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+}
+
+/* Citation Item */
+.citation-item {
+    background: var(--bg-app);
+    border-left: 3px solid var(--accent-mode);
+    padding: var(--space-sm);
+    margin-bottom: var(--space-sm);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.citation-item:hover {
+    background: #EFEFEF;
+}
+
+.citation-source {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.citation-type {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.citation-loc {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
