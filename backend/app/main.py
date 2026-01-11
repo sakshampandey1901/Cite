@@ -7,6 +7,8 @@ import logging
 
 from app.core.config import settings
 from app.api.routes import router
+from app.api.auth import router as auth_router
+from app.models.database import init_db
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +25,19 @@ app = FastAPI(
     docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None
 )
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database tables on application startup."""
+    logger.info("Initializing database...")
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.warning(f"Database initialization failed (will retry on first request): {e}")
+        # Don't raise - allow server to start even if DB is unavailable
+        # Tables will be created on first DB access
 
 # CORS middleware
 app.add_middleware(
@@ -86,6 +101,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # Include API routes
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(router, prefix="/api/v1")
 
 

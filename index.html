@@ -8,12 +8,13 @@
   <link rel="stylesheet" href="./src/style.css">
   <link rel="stylesheet" href="./src/styles/layout.css">
   <link rel="stylesheet" href="./src/styles/components.css">
+  <link rel="stylesheet" href="./src/styles/auth.css">
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap">
 </head>
 
 <body>
-  <div id="app" class="app-container">
+  <div id="app" class="app-container" style="display: none;">
     <!-- Left: Knowledge Base -->
     <aside class="region-left" id="region-left">
       <div class="app-logo">Cite</div>
@@ -28,6 +29,9 @@
     <main class="region-center">
       <div class="workspace-header">
         <div id="mode-selector" class="mode-selector-group"></div>
+        <button id="btn-logout" style="display: none; position: absolute; top: 10px; right: 10px; padding: 8px 16px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">
+          Logout
+        </button>
       </div>
       <div class="workspace-editor-container">
         <div id="editor" class="editor-surface" contenteditable="true" placeholder="Start thinking..."></div>

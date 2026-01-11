@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug PDF Upload</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        .step {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #0056b3; }
+        button.success { background: #28a745; }
+        button.danger { background: #dc3545; }
+        #output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log { margin: 5px 0; }
+        .log.error { color: #ff6b6b; }
+        .log.success { color: #51cf66; }
+        .log.info { color: #74c0fc; }
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px dashed #007bff;
+            border-radius: 4px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug PDF Upload Issue</h1>
+
+        <div class="step">
+            <h3>Step 1: Set Auth Token</h3>
+            <button onclick="setToken()">Set Development Token</button>
+            <button onclick="checkToken()" class="success">Check Token Status</button>
+            <button onclick="clearToken()" class="danger">Clear Token</button>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Select and Upload PDF</h3>
+            <input type="file" id="fileInput" accept=".pdf,.txt,.md" />
+            <button onclick="uploadFile()">Upload File</button>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: View Debug Logs</h3>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        const DEV_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXYtdXNlci0xMjMiLCJleHAiOjE3Njg3MDM2NTh9.h2edhIlzjZ5Cy1tv283wNwmg6xrM3M2dv9wnpjvlmfg';
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            output.appendChild(logEntry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        function setToken() {
+            try {
+                localStorage.setItem('auth_token', DEV_TOKEN);
+                log('✅ Token set successfully', 'success');
+                log(`Token: ${DEV_TOKEN.substring(0, 50)}...`, 'info');
+
+                // Decode and show info
+                const payload = JSON.parse(atob(DEV_TOKEN.split('.')[1]));
+                const expDate = new Date(payload.exp * 1000);
+                log(`User ID: ${payload.sub}`, 'info');
+                log(`Expires: ${expDate.toLocaleString()}`, 'info');
+            } catch (error) {
+                log(`❌ Error setting token: ${error.message}`, 'error');
+            }
+        }
+
+        function checkToken() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                log('❌ No token found in localStorage', 'error');
+                return;
+            }
+
+            log('✅ Token found in localStorage', 'success');
+            log(`Token: ${token.substring(0, 50)}...`, 'info');
+
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const expDate = new Date(payload.exp * 1000);
+                const now = new Date();
+
+                log(`User ID: ${payload.sub}`, 'info');
+                log(`Expires: ${expDate.toLocaleString()}`, 'info');
+
+                if (expDate > now) {
+                    const hoursLeft = Math.floor((expDate - now) / (1000 * 60 * 60));
+                    log(`✅ Token is VALID (${hoursLeft} hours remaining)`, 'success');
+                } else {
+                    log('❌ Token has EXPIRED', 'error');
+                }
+            } catch (error) {
+                log(`❌ Error decoding token: ${error.message}`, 'error');
+            }
+        }
+
+        function clearToken() {
+            localStorage.removeItem('auth_token');
+            log('Token cleared from localStorage', 'info');
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                log('❌ Please select a file first', 'error');
+                return;
+            }
+
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                log('❌ No auth token found. Click "Set Development Token" first', 'error');
+                return;
+            }
+
+            log(`📤 Starting upload: ${file.name} (${file.size} bytes)`, 'info');
+            log(`File type: ${file.type || 'unknown'}`, 'info');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const url = `${API_BASE}/documents/upload`;
+            log(`Uploading to: ${url}`, 'info');
+            log(`Authorization: Bearer ${token.substring(0, 30)}...`, 'info');
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                log(`Response status: ${response.status} ${response.statusText}`,
+                    response.ok ? 'success' : 'error');
+
+                // Log response headers
+                log('Response headers:', 'info');
+                response.headers.forEach((value, key) => {
+                    log(`  ${key}: ${value}`, 'info');
+                });
+
+                // Get response body
+                const contentType = response.headers.get('content-type');
+                let data;
+
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                    log('Response body:', 'info');
+                    log(JSON.stringify(data, null, 2), response.ok ? 'success' : 'error');
+                } else {
+                    const text = await response.text();
+                    log('Response body (text):', 'info');
+                    log(text, response.ok ? 'success' : 'error');
+                }
+
+                if (response.ok) {
+                    log('✅ UPLOAD SUCCESSFUL!', 'success');
+                    if (data && data.document_id) {
+                        log(`Document ID: ${data.document_id}`, 'success');
+                        log(`Status: ${data.status}`, 'success');
+                    }
+                } else {
+                    log('❌ UPLOAD FAILED', 'error');
+                    if (data && data.detail) {
+                        log(`Error: ${data.detail}`, 'error');
+                    }
+                }
+
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+                log(`Full error: ${error.stack}`, 'error');
+            }
+        }
+
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            log('🚀 Debug tool loaded', 'info');
+            log('Checking for existing token...', 'info');
+
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                checkToken();
+            } else {
+                log('⚠️ No token found. Click "Set Development Token" to begin', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -2,10 +2,22 @@ import { KnowledgeBase } from './components/KnowledgeBase.js';
 import { ModeSelector } from './components/ModeSelector.js';
 import { OutputPanel } from './components/OutputPanel.js';
 import { TransparencyPanel } from './components/TransparencyPanel.js';
+import { AuthModal } from './components/AuthModal.js';
 import { api } from './services/api.js';
 
 class App {
   constructor() {
+    this.authModal = new AuthModal();
+
+    // Check authentication before initializing app
+    if (!this.checkAuth()) {
+      return; // Don't initialize app if not authenticated
+    }
+
+    // Expose UI if authenticated
+    document.getElementById('app').style.display = 'grid';
+    document.getElementById('btn-logout').style.display = 'block';
+
     this.kb = new KnowledgeBase('knowledge-base-list');
     this.modeSelector = new ModeSelector('mode-selector', (mode) => this.handleModeChange(mode));
     this.outputPanel = new OutputPanel('output-content');
@@ -16,6 +28,27 @@ class App {
 
     this.initActionArea();
     this.initUpload();
+    this.initLogout();
+  }
+
+  checkAuth() {
+    const token = api.getToken();
+    if (!token) {
+      // Show login modal
+      this.authModal.show();
+      return false;
+    }
+    return true;
+  }
+
+  initLogout() {
+    const logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        api.clearToken();
+        window.location.reload();
+      });
+    }
   }
 
   handleModeChange(mode) {

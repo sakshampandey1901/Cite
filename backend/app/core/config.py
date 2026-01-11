@@ -1,7 +1,6 @@
 """Application configuration using Pydantic settings."""
 from pydantic_settings import BaseSettings
 from typing import List
-import secrets
 
 
 class Settings(BaseSettings):
@@ -14,7 +13,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Security
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    SECRET_KEY: str  # Must be set in .env file
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
@@ -25,6 +24,7 @@ class Settings(BaseSettings):
 
     # Vector Database
     PINECONE_API_KEY: str
+    PINECONE_CLOUD: str = "gcp"
     PINECONE_ENVIRONMENT: str = "us-west1-gcp"
     PINECONE_INDEX_NAME: str = "cognitive-assistant"
 

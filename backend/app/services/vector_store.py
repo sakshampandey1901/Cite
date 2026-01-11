@@ -37,7 +37,7 @@ class VectorStore:
                 dimension=self.EMBEDDING_DIMENSION,
                 metric='cosine',
                 spec=ServerlessSpec(
-                    cloud='aws',
+                    cloud=settings.PINECONE_CLOUD,
                     region=settings.PINECONE_ENVIRONMENT
                 )
             )

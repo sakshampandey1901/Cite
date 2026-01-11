@@ -1,9 +1,11 @@
 """SQLAlchemy database models."""
-from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Text, Float, Boolean
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Text, Float, Boolean, create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, sessionmaker, Session
 from datetime import datetime
 import enum
+from typing import Generator
+from app.core.config import settings
 
 
 Base = declarative_base()
@@ -98,3 +100,43 @@ class AssistanceLog(Base):
     retrieval_time_ms = Column(Integer, nullable=True)
     generation_time_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+# Database connection setup
+# Database connection setup
+connect_args = {}
+engine_args = {
+    "pool_pre_ping": True
+}
+
+if "sqlite" in settings.DATABASE_URL:
+    connect_args["check_same_thread"] = False
+    engine_args["connect_args"] = connect_args
+else:
+    engine_args["pool_size"] = settings.DATABASE_POOL_SIZE
+    engine_args["max_overflow"] = settings.DATABASE_MAX_OVERFLOW
+
+engine = create_engine(
+    settings.DATABASE_URL,
+    **engine_args
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    Database session dependency for FastAPI.
+
+    Yields a database session and ensures it's closed after use.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_db():
+    """Initialize database tables."""
+    Base.metadata.create_all(bind=engine)

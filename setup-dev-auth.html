@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Development Authentication</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        .token-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        .step h3 {
+            margin-top: 0;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Development Authentication Setup</h1>
+        <p class="subtitle">Configure your browser for local development</p>
+
+        <div id="status" class="status"></div>
+
+        <div class="step">
+            <h3>What this does:</h3>
+            <ul>
+                <li>Sets a development JWT token in your browser's localStorage</li>
+                <li>Allows you to upload files and use authenticated endpoints</li>
+                <li>Token is valid for 24 hours</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>Quick Setup:</h3>
+            <ol>
+                <li>Click the "Setup Auth Token" button below</li>
+                <li>Open your application at <code>http://localhost:5173</code> or <code>http://localhost:3000</code></li>
+                <li>Try uploading a PDF file - it should now work!</li>
+            </ol>
+        </div>
+
+        <button onclick="setupAuth()">Setup Auth Token</button>
+        <button onclick="checkAuth()" class="secondary">Check Current Token</button>
+        <button onclick="clearAuth()" class="secondary">Clear Token</button>
+
+        <div class="token-info">
+            <strong>Development Token:</strong><br>
+            <span id="tokenDisplay">Click "Setup Auth Token" to see the token</span>
+        </div>
+
+        <div class="step">
+            <h3>⚠️ Important Notes:</h3>
+            <ul>
+                <li>This is for <strong>development only</strong> - never use in production</li>
+                <li>The token expires after 24 hours</li>
+                <li>Your backend must be running on <code>http://localhost:8000</code></li>
+                <li>CORS must allow your frontend origin</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const DEV_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXYtdXNlci0xMjMiLCJleHAiOjE3Njg3MDM2NTh9.h2edhIlzjZ5Cy1tv283wNwmg6xrM3M2dv9wnpjvlmfg';
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function setupAuth() {
+            try {
+                localStorage.setItem('auth_token', DEV_TOKEN);
+                document.getElementById('tokenDisplay').textContent = DEV_TOKEN;
+                showStatus('✅ Success! Authentication token has been set. You can now upload files in your application.', 'success');
+
+                // Also check if we can verify the token
+                checkBackendConnection();
+            } catch (error) {
+                showStatus('❌ Error: Failed to set token. ' + error.message, 'error');
+            }
+        }
+
+        function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                document.getElementById('tokenDisplay').textContent = token;
+                showStatus('✅ Token is set in localStorage', 'success');
+
+                // Decode and show expiration
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const expDate = new Date(payload.exp * 1000);
+                    const now = new Date();
+
+                    if (expDate > now) {
+                        const hoursLeft = Math.floor((expDate - now) / (1000 * 60 * 60));
+                        showStatus(`✅ Token is valid. Expires in ${hoursLeft} hours (${expDate.toLocaleString()})`, 'success');
+                    } else {
+                        showStatus('⚠️ Token has expired! Click "Setup Auth Token" to get a new one.', 'error');
+                    }
+                } catch (e) {
+                    showStatus('✅ Token is set, but could not decode expiration.', 'info');
+                }
+            } else {
+                document.getElementById('tokenDisplay').textContent = 'No token found';
+                showStatus('⚠️ No token found. Click "Setup Auth Token" to set one.', 'error');
+            }
+        }
+
+        function clearAuth() {
+            localStorage.removeItem('auth_token');
+            document.getElementById('tokenDisplay').textContent = 'Token cleared';
+            showStatus('Token has been removed from localStorage', 'info');
+        }
+
+        async function checkBackendConnection() {
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(`✅ Success! Token set and backend is running (${data.service})`, 'success');
+                } else {
+                    showStatus('⚠️ Token is set, but could not connect to backend. Make sure it\'s running on http://localhost:8000', 'error');
+                }
+            } catch (error) {
+                showStatus('⚠️ Token is set, but backend appears to be offline. Start your backend server.', 'error');
+            }
+        }
+
+        // Check on page load
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                checkAuth();
+            } else {
+                showStatus('ℹ️ No authentication token found. Click "Setup Auth Token" to get started.', 'info');
+            }
+        });
+    </script>
+</body>
+</html>
