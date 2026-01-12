@@ -1,11 +1,55 @@
 """Security tests for injection attacks, IDOR, and auth bypass."""
 import pytest
 from fastapi.testclient import TestClient
+from passlib.context import CryptContext
 from app.main import app
-from app.core.security import sanitize_filename, validate_file_type
+from app.core.security import (
+    sanitize_filename,
+    validate_file_type,
+    get_password_hash,
+    verify_password,
+    verify_password_and_update,
+)
 
 
 client = TestClient(app)
+
+
+def _legacy_normalize_password(password: str) -> str:
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    return password_bytes.decode("utf-8", errors="ignore")
+
+
+class TestPasswordHashing:
+    """Test password hashing behavior."""
+
+    def test_short_password(self):
+        password = "shortpass"
+        hashed = get_password_hash(password)
+        assert verify_password(password, hashed)
+
+    def test_long_password(self):
+        password = "a" * 150
+        hashed = get_password_hash(password)
+        assert verify_password(password, hashed)
+
+    def test_unicode_password(self):
+        password = "pässwørd🔒" * 20
+        hashed = get_password_hash(password)
+        assert verify_password(password, hashed)
+
+    def test_legacy_hash_upgrade(self):
+        legacy_context = CryptContext(schemes=["bcrypt"])
+        password = "a" * 80
+        legacy_hash = legacy_context.hash(_legacy_normalize_password(password))
+
+        verified, upgraded_hash = verify_password_and_update(password, legacy_hash)
+
+        assert verified is True
+        assert upgraded_hash is not None
+        assert verify_password(password, upgraded_hash)
 
 
 class TestInputSanitization:

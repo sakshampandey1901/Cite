@@ -8,8 +8,25 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
 
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing (bcrypt_sha256 pre-hashes to avoid bcrypt's 72-byte limit)
+pwd_context = CryptContext(schemes=["bcrypt_sha256", "bcrypt"], deprecated="auto")
+
+
+def _legacy_normalize_password(password: str) -> str:
+    """
+    Legacy normalization for bcrypt limits (72-byte max).
+
+    This preserves historical behavior for existing hashes.
+    """
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    return password_bytes.decode("utf-8", errors="ignore")
+
+
+def _is_bcrypt_sha256_hash(hashed_password: str) -> bool:
+    return hashed_password.startswith("$bcrypt-sha256$")
+
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
@@ -26,7 +43,23 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if password matches
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    if _is_bcrypt_sha256_hash(hashed_password):
+        return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(_legacy_normalize_password(plain_password), hashed_password)
+
+
+def verify_password_and_update(plain_password: str, hashed_password: str) -> tuple[bool, Optional[str]]:
+    """
+    Verify a password and return a replacement hash when upgrading legacy hashes.
+    """
+    if _is_bcrypt_sha256_hash(hashed_password):
+        return pwd_context.verify_and_update(plain_password, hashed_password)
+
+    legacy_password = _legacy_normalize_password(plain_password)
+    verified = pwd_context.verify(legacy_password, hashed_password)
+    if not verified:
+        return False, None
+    return True, pwd_context.hash(plain_password)
 
 
 def get_password_hash(password: str) -> str:

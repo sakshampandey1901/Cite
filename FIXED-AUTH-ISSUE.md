@@ -14,9 +14,6 @@ PDF uploads were failing with "Could not validate credentials" error because:
 - Now reads SECRET_KEY from .env file (stable across restarts)
 
 **Added**: [backend/.env](backend/.env)
-```bash
-SECRET_KEY=35OnS-uT1UY2omB5gwgig-HOTq20Su13Z8h0xBy9B5c
-```
 
 ### 2. Restarted Backend Server
 Backend is now running with the stable SECRET_KEY:

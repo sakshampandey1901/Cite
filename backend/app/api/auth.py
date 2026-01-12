@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from app.core.security import (
-    verify_password,
+    verify_password_and_update,
     get_password_hash,
     create_access_token,
     get_current_user_id
@@ -77,9 +77,16 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
         hashed_password=hashed_password
     )
 
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    try:
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user account"
+        )
 
     # Generate access token
     access_token = create_access_token(
@@ -115,12 +122,21 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         )
 
     # Verify password
-    if not verify_password(request.password, user.hashed_password):
+    verified, upgraded_hash = verify_password_and_update(request.password, user.hashed_password)
+    if not verified:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    if upgraded_hash:
+        try:
+            user.hashed_password = upgraded_hash
+            db.add(user)
+            db.commit()
+        except Exception:
+            db.rollback()
 
     # Check if user is active
     if not user.is_active:
