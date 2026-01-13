@@ -85,7 +85,8 @@ class VectorStore:
             # Create unique ID
             chunk_id = f"{user_id}_{document_id}_{chunk['chunk_index']}"
 
-            # Prepare metadata
+            # Prepare metadata - filter out None values for Pinecone compatibility
+            # Pinecone only accepts: string, number, boolean, or list of strings
             metadata = {
                 'user_id': user_id,
                 'document_id': document_id,
@@ -94,9 +95,13 @@ class VectorStore:
                 'source_filename': chunk['source_filename'],
                 'content_type': chunk['content_type'],
                 'rhetorical_role': chunk['rhetorical_role'],
-                'page_number': chunk.get('page_number'),
-                'timestamp': chunk.get('timestamp'),
             }
+
+            # Add optional fields only if they have valid values
+            if chunk.get('page_number') is not None:
+                metadata['page_number'] = chunk['page_number']
+            if chunk.get('timestamp') is not None:
+                metadata['timestamp'] = chunk['timestamp']
 
             vectors.append({
                 'id': chunk_id,

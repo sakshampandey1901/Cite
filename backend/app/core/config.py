@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # Supabase
+    SUPABASE_URL: str  # Supabase project URL
+    SUPABASE_KEY: str  # Supabase anon/public key
+
     # Database
     DATABASE_URL: str
     DATABASE_POOL_SIZE: int = 10

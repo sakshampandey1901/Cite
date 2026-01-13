@@ -31,12 +31,12 @@ class ContentTypeEnum(str, enum.Enum):
 
 
 class User(Base):
-    """User account model."""
+    """User account model synced with Supabase Auth."""
     __tablename__ = "users"
 
-    id = Column(String(36), primary_key=True)
+    id = Column(String(36), primary_key=True)  # Matches Supabase Auth user ID
     email = Column(String(255), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True, default="")  # Deprecated: Managed by Supabase Auth
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

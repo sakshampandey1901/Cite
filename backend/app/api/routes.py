@@ -92,6 +92,11 @@ async def upload_document(
         # Prepare chunks for vector store
         chunk_dicts = []
         for chunk in chunks:
+            # Get rhetorical role and convert enum to string value
+            rhetorical_role = chunk.metadata.get('rhetorical_role', 'unknown')
+            if hasattr(rhetorical_role, 'value'):
+                rhetorical_role = rhetorical_role.value
+
             chunk_dicts.append({
                 'content': chunk.content,
                 'chunk_index': chunk.chunk_index,
@@ -99,7 +104,7 @@ async def upload_document(
                 'timestamp': chunk.timestamp,
                 'source_filename': safe_filename,
                 'content_type': content_type.value,
-                'rhetorical_role': chunk.metadata.get('rhetorical_role', 'unknown')
+                'rhetorical_role': rhetorical_role
             })
 
         # Insert into vector store

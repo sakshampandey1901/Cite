@@ -1,16 +1,11 @@
-"""Authentication API endpoints."""
+"""Authentication API endpoints using Supabase Auth."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from datetime import timedelta
 
-from app.core.security import (
-    verify_password_and_update,
-    get_password_hash,
-    create_access_token,
-    get_current_user_id
-)
+from app.core.supabase_client import supabase
+from app.core.security import get_current_user_id
 from app.models.database import get_db, User
 
 router = APIRouter(tags=["authentication"])
@@ -48,114 +43,161 @@ class AuthResponse(BaseModel):
 @router.post("/auth/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     """
-    Create a new user account.
+    Create a new user account using Supabase Auth.
 
     - **email**: Valid email address
-    - **password**: Minimum 8 characters
+    - **password**: Minimum 8 characters (enforced by Supabase)
 
     Returns access token for immediate use.
     """
-    # Validate password length
-    if len(request.password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long"
-        )
-
-    # Check if user already exists
-    existing_user = db.query(User).filter(User.email == request.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-
-    # Create new user
-    hashed_password = get_password_hash(request.password)
-    new_user = User(
-        email=request.email,
-        hashed_password=hashed_password
-    )
-
     try:
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user account"
+        # Supabase handles password validation and hashing automatically
+        auth_response = supabase.auth.sign_up({
+            "email": request.email,
+            "password": request.password
+        })
+
+        if not auth_response.user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to create user account"
+            )
+
+        user_id = auth_response.user.id
+
+        # Check if session was created (email confirmation may be required)
+        if not auth_response.session:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email confirmation required. Please check your email or disable email confirmation in Supabase dashboard (Settings > Auth > Email Provider > Disable 'Enable email confirmations')"
+            )
+
+        access_token = auth_response.session.access_token
+        if not access_token:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate access token"
+            )
+
+        # Sync user to local database for application data (documents, etc.)
+        existing_user = db.query(User).filter(User.id == user_id).first()
+        if not existing_user:
+            new_user = User(
+                id=user_id,
+                email=request.email,
+                hashed_password=""  # Managed by Supabase Auth
+            )
+            try:
+                db.add(new_user)
+                db.commit()
+                db.refresh(new_user)
+            except Exception:
+                db.rollback()
+                # Continue even if local sync fails - auth still succeeded
+
+        return AuthResponse(
+            access_token=access_token,
+            user_id=user_id,
+            email=request.email
         )
 
-    # Generate access token
-    access_token = create_access_token(
-        data={"sub": new_user.id},
-        expires_delta=timedelta(days=7)
-    )
+    except Exception as e:
+        error_message = str(e)
 
-    return AuthResponse(
-        access_token=access_token,
-        user_id=new_user.id,
-        email=new_user.email
-    )
+        # Handle common Supabase Auth errors
+        if "already registered" in error_message.lower() or "already exists" in error_message.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        elif "password" in error_message.lower() and "short" in error_message.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters long"
+            )
+        elif "invalid" in error_message.lower() and "email" in error_message.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid email format"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Authentication error: {error_message}"
+            )
 
 
 @router.post("/auth/login", response_model=AuthResponse)
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
-    Login with email and password.
+    Login with email and password using Supabase Auth.
 
     - **email**: Registered email address
     - **password**: Account password
 
-    Returns access token valid for 7 days.
+    Returns access token managed by Supabase.
     """
-    # Find user by email
-    user = db.query(User).filter(User.email == request.email).first()
+    try:
+        # Supabase handles password verification and hashing automatically
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": request.email,
+            "password": request.password
+        })
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+        if not auth_response.user or not auth_response.session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        user_id = auth_response.user.id
+        access_token = auth_response.session.access_token
+
+        # Check local user status
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is deactivated"
+            )
+
+        # Sync user to local database if not exists
+        if not user:
+            new_user = User(
+                id=user_id,
+                email=request.email,
+                hashed_password=""  # Managed by Supabase Auth
+            )
+            try:
+                db.add(new_user)
+                db.commit()
+            except Exception:
+                db.rollback()
+
+        return AuthResponse(
+            access_token=access_token,
+            user_id=user_id,
+            email=request.email
         )
 
-    # Verify password
-    verified, upgraded_hash = verify_password_and_update(request.password, user.hashed_password)
-    if not verified:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_message = str(e)
 
-    if upgraded_hash:
-        try:
-            user.hashed_password = upgraded_hash
-            db.add(user)
-            db.commit()
-        except Exception:
-            db.rollback()
-
-    # Check if user is active
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is deactivated"
-        )
-
-    # Generate access token
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(days=7)
-    )
-
-    return AuthResponse(
-        access_token=access_token,
-        user_id=user.id,
-        email=user.email
-    )
+        # Handle common Supabase Auth errors
+        if "invalid" in error_message.lower() and ("credentials" in error_message.lower() or "login" in error_message.lower()):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Authentication error: {error_message}"
+            )
 
 
 @router.get("/auth/me")
