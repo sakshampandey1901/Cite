@@ -9,8 +9,19 @@ class App {
   constructor() {
     this.authModal = new AuthModal();
 
+    // Listen for authentication failures
+    window.addEventListener('auth-failed', (e) => {
+      this.handleAuthFailure(e.detail.message);
+    });
+
+    // Initialize app asynchronously
+    this.init();
+  }
+
+  async init() {
     // Check authentication before initializing app
-    if (!this.checkAuth()) {
+    const isAuthenticated = await this.checkAuth();
+    if (!isAuthenticated) {
       return; // Don't initialize app if not authenticated
     }
 
@@ -31,14 +42,34 @@ class App {
     this.initLogout();
   }
 
-  checkAuth() {
+  handleAuthFailure(message) {
+    // Show error message
+    alert(message || 'Session expired. Please login again.');
+    // Show login modal
+    this.authModal.show();
+    // Hide app content
+    document.getElementById('app').style.display = 'none';
+  }
+
+  async checkAuth() {
     const token = api.getToken();
     if (!token) {
       // Show login modal
       this.authModal.show();
       return false;
     }
-    return true;
+
+    // Validate token with backend (optional health check)
+    try {
+      await api.healthCheck();
+      return true;
+    } catch (error) {
+      // Token exists but is invalid
+      console.warn('Token validation failed:', error);
+      api.clearToken();
+      this.authModal.show();
+      return false;
+    }
   }
 
   initLogout() {

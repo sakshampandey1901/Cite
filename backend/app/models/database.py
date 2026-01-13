@@ -1,13 +1,15 @@
 """SQLAlchemy database models."""
-from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Text, Float, Boolean, create_engine
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Text, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
 from datetime import datetime
 import enum
+import logging
 from typing import Generator
 from app.core.config import settings
+from app.core.database import create_database_engine, test_database_connection, DatabaseConnectionError
 
-
+logger = logging.getLogger(__name__)
 Base = declarative_base()
 
 
@@ -103,23 +105,25 @@ class AssistanceLog(Base):
 
 
 # Database connection setup
-# Database connection setup
-connect_args = {}
-engine_args = {
-    "pool_pre_ping": True
-}
-
-if "sqlite" in settings.DATABASE_URL:
-    connect_args["check_same_thread"] = False
-    engine_args["connect_args"] = connect_args
-else:
-    engine_args["pool_size"] = settings.DATABASE_POOL_SIZE
-    engine_args["max_overflow"] = settings.DATABASE_MAX_OVERFLOW
-
-engine = create_engine(
-    settings.DATABASE_URL,
-    **engine_args
-)
+# Use production-ready engine configuration
+try:
+    engine = create_database_engine()
+    logger.info("Database engine initialized successfully")
+except DatabaseConnectionError as e:
+    logger.error(f"Database configuration error: {e}")
+    # Re-raise to fail fast in production, but allow graceful handling in development
+    if settings.ENVIRONMENT == "production":
+        raise
+    # In development, create a basic engine that will fail on first use
+    # This allows the app to start but will show errors when DB is accessed
+    from sqlalchemy import create_engine
+    engine = create_engine(
+        settings.DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW,
+    )
+    logger.warning("Database engine created with basic configuration (connection not validated)")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -138,5 +142,34 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db():
-    """Initialize database tables."""
-    Base.metadata.create_all(bind=engine)
+    """
+    Initialize database tables and verify connection.
+    
+    Raises:
+        DatabaseConnectionError: If connection test fails in production
+    """
+    logger.info("Initializing database...")
+    
+    # Test connection before creating tables
+    success, error_msg = test_database_connection(engine)
+    if not success:
+        error = DatabaseConnectionError(
+            f"Database connection test failed:\n{error_msg}\n\n"
+            "Cannot initialize database tables without a valid connection."
+        )
+        if settings.ENVIRONMENT == "production":
+            logger.error(str(error))
+            raise error
+        else:
+            logger.warning(f"Database connection test failed (non-production): {error_msg}")
+            logger.warning("Tables will not be created. Fix connection and restart.")
+            return
+    
+    # Create tables
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to create database tables: {e}")
+        if settings.ENVIRONMENT == "production":
+            raise

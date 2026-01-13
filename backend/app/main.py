@@ -8,7 +8,8 @@ import logging
 from app.core.config import settings
 from app.api.routes import router
 from app.api.auth import router as auth_router
-from app.models.database import init_db
+from app.models.database import init_db, engine
+from app.core.database import test_database_connection, DatabaseConnectionError, get_connection_info
 
 # Configure logging
 logging.basicConfig(
@@ -29,15 +30,57 @@ app = FastAPI(
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database tables on application startup."""
-    logger.info("Initializing database...")
+    """
+    Initialize database connection and tables on application startup.
+    
+    In production, fails fast if database is unreachable.
+    In development, logs warnings but allows startup.
+    """
+    logger.info("Starting database initialization...")
+    
+    # Test connection first
+    logger.info("Testing database connection...")
+    success, error_msg = test_database_connection(engine)
+    
+    if not success:
+        error = DatabaseConnectionError(
+            f"Database connection failed during startup:\n{error_msg}"
+        )
+        
+        if settings.ENVIRONMENT == "production":
+            logger.error("=" * 80)
+            logger.error("PRODUCTION: Database connection failed - application will not start")
+            logger.error("=" * 80)
+            logger.error(str(error))
+            logger.error("=" * 80)
+            raise error
+        else:
+            logger.warning("=" * 80)
+            logger.warning("DEVELOPMENT: Database connection failed - application will start but DB operations will fail")
+            logger.warning("=" * 80)
+            logger.warning(str(error))
+            logger.warning("=" * 80)
+            logger.warning("Fix the connection and restart the application")
+            return
+    
+    # Log connection info
+    conn_info = get_connection_info(engine)
+    logger.info(f"Database connection verified: {conn_info.get('url_masked', 'N/A')}")
+    
+    # Initialize tables
     try:
         init_db()
-        logger.info("Database initialized successfully")
+        logger.info("✅ Database initialization completed successfully")
+    except DatabaseConnectionError as e:
+        if settings.ENVIRONMENT == "production":
+            logger.error(f"Database initialization failed in production: {e}")
+            raise
+        else:
+            logger.warning(f"Database initialization failed (non-production): {e}")
     except Exception as e:
-        logger.warning(f"Database initialization failed (will retry on first request): {e}")
-        # Don't raise - allow server to start even if DB is unavailable
-        # Tables will be created on first DB access
+        logger.error(f"Unexpected error during database initialization: {e}", exc_info=True)
+        if settings.ENVIRONMENT == "production":
+            raise
 
 # CORS middleware
 app.add_middleware(

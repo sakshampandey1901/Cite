@@ -82,6 +82,16 @@ class APIService {
       // Handle non-2xx responses
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        // Handle authentication errors (401 Unauthorized)
+        if (response.status === 401) {
+          this.clearToken();
+          // Dispatch custom event for auth failure
+          window.dispatchEvent(new CustomEvent('auth-failed', {
+            detail: { message: 'Session expired. Please login again.' }
+          }));
+        }
+
         throw new APIError(
           errorData.detail || 'Request failed',
           response.status,
