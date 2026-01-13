@@ -1,6 +1,6 @@
 # Implementation Guide
 
-This guide explains how to deploy and run the AI-powered cognitive assistant system.
+This guide explains how to deploy and run Cite.
 
 ---
 
@@ -80,7 +80,7 @@ EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 PINECONE_API_KEY=xxxxx
 
 # Database (use defaults for local development)
-DATABASE_URL=postgresql://cognitive_user:cognitive_pass@localhost:5432/cognitive_assistant
+DATABASE_URL=postgresql://cognitive_user:cognitive_pass@localhost:5432/cite
 REDIS_URL=redis://localhost:6379/0
 
 # Security (generate a secure key for production)
