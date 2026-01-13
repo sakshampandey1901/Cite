@@ -124,8 +124,8 @@ def test_connection_url(url: Optional[str] = None) -> bool:
     
     print_section("✅ Connection Test Successful", "=")
     print(f"\nYour database connection is working correctly!")
-    print(f"\nUse this URL in your .env file:")
-    print(f"{normalized_url}")
+    print(f"\nUse this URL in your .env file (masked here):")
+    print(f"{_mask_password_in_url(normalized_url)}")
     print()
     
     return True
