@@ -11,12 +11,15 @@ from app.models.schemas import (
     AssistRequest, AssistResponse, DocumentUploadResponse,
     DocumentListResponse, TaskMode, SourceCitation
 )
+from app.models.database import get_db, Document
 from app.core.security import get_current_user_id, sanitize_filename, validate_file_type
 from app.core.config import settings
+from app.core.rate_limiter import rate_limiter
 from app.services.document_processor import DocumentProcessor
 from app.services.vector_store import VectorStore
 from app.services.prompt_builder import PromptBuilder
 from app.services.llm_service import LLMService
+from sqlalchemy.orm import Session
 
 
 router = APIRouter()
@@ -31,17 +34,22 @@ llm_service = LLMService()
 @router.post("/documents/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
 ):
     """
     Upload and process a document.
 
     Security:
     - Requires authentication
+    - Rate limited (configurable per user)
     - Validates file type and size
     - Sanitizes filename
     - User-scoped storage
     """
+    # Check rate limit
+    rate_limiter.check_rate_limit(user_id, "upload", settings.RATE_LIMIT_UPLOAD)
+
     # Validate file type
     if not validate_file_type(file.filename, settings.allowed_extensions_list):
         raise HTTPException(
@@ -110,6 +118,21 @@ async def upload_document(
         # Insert into vector store
         vector_store.upsert_chunks(chunk_dicts, user_id, document_id)
 
+        # Save document metadata to database
+        db_document = Document(
+            id=document_id,
+            user_id=user_id,
+            filename=safe_filename,
+            original_filename=file.filename,
+            content_type=content_type,
+            status="ready",
+            file_size_bytes=file_size,
+            chunk_count=len(chunks)
+        )
+        db.add(db_document)
+        db.commit()
+        db.refresh(db_document)
+
         # Clean up temporary file
         file_path.unlink()
 
@@ -122,6 +145,7 @@ async def upload_document(
 
     except Exception as e:
         # Clean up on error
+        db.rollback()
         if file_path.exists():
             file_path.unlink()
         raise HTTPException(
@@ -141,9 +165,12 @@ async def get_assistance(
     Security:
     - Requires authentication
     - Input validation via Pydantic
-    - Rate limited (configured in middleware)
+    - Rate limited (configurable per user)
     - User-scoped retrieval
     """
+    # Check rate limit
+    rate_limiter.check_rate_limit(user_id, "assist", settings.RATE_LIMIT_ASSIST)
+
     start_time = time.time()
 
     try:
@@ -231,7 +258,10 @@ async def get_assistance(
 
 
 @router.get("/documents", response_model=List[DocumentListResponse])
-async def list_documents(user_id: str = Depends(get_current_user_id)):
+async def list_documents(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
     """
     List user's documents.
 
@@ -239,15 +269,40 @@ async def list_documents(user_id: str = Depends(get_current_user_id)):
     - Requires authentication
     - User-scoped query
     """
-    # This would query the database in production
-    # For MVP, return empty list (database integration pending)
-    return []
+    try:
+        # Query user's documents from database
+        documents = db.query(Document).filter(
+            Document.user_id == user_id
+        ).order_by(
+            Document.created_at.desc()
+        ).all()
+
+        # Convert to response model
+        return [
+            DocumentListResponse(
+                id=doc.id,
+                title=doc.original_filename,
+                content_type=doc.content_type.value,
+                status=doc.status.value,
+                created_at=doc.created_at,
+                updated_at=doc.updated_at,
+                chunk_count=doc.chunk_count
+            )
+            for doc in documents
+        ]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve documents: {str(e)}"
+        )
 
 
 @router.delete("/documents/{document_id}")
 async def delete_document(
     document_id: str,
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
 ):
     """
     Delete a document.
@@ -257,15 +312,34 @@ async def delete_document(
     - Ownership verification (user can only delete their own documents)
     """
     try:
-        # Verify ownership by attempting user-scoped deletion
+        # Verify ownership and get document from database
+        db_document = db.query(Document).filter(
+            Document.id == document_id,
+            Document.user_id == user_id
+        ).first()
+
+        if not db_document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found or you don't have permission to delete it"
+            )
+
+        # Delete from vector store
         vector_store.delete_document(user_id, document_id)
+
+        # Delete from database (cascade will handle related records)
+        db.delete(db_document)
+        db.commit()
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={"message": "Document deleted successfully"}
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete document: {str(e)}"

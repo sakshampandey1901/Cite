@@ -32,16 +32,25 @@ class LLMService:
             Generated guidance text
         """
         try:
+            # Split prompt into system and user parts for better API compatibility
+            parts = prompt.split("\n---\n", 1)
+            if len(parts) >= 2:
+                system_content = parts[0]
+                user_content = "\n---\n".join(parts[1:])
+
+                messages = [
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": user_content}
+                ]
+            else:
+                # Fallback: use entire prompt as user message
+                messages = [{"role": "user", "content": prompt}]
+
             message = self.client.chat.completions.create(
                 model=self.model,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+                messages=messages
             )
 
             # Extract text from response

@@ -1,0 +1,293 @@
+================================================================================
+PRE-LAUNCH CHECKLIST - Cognitive Assistant MVP
+================================================================================
+
+Date: _________________
+Reviewer: _________________
+
+================================================================================
+1. ENVIRONMENT CONFIGURATION
+================================================================================
+
+[✓] ENVIRONMENT=production in backend/.env
+[✓] API_RELOAD=False in backend/.env
+[✓] SECRET_KEY rotated (new value: Pz4vex7U-XwmTzbCrQHvslO8QAkuKe6YiUN5_uSmn2s)
+[ ] CORS_ORIGINS updated to actual production domains
+    Current: https://yourdomain.com,https://www.yourdomain.com
+    Update to: ___________________________________________
+
+[ ] Sentry DSN configured (optional but recommended)
+    SENTRY_DSN=___________________________________________
+
+================================================================================
+2. CREDENTIALS VERIFICATION
+================================================================================
+
+[✓] SECRET_KEY: New value generated (MUST NOT use old development key)
+[ ] Supabase: Verify using PRODUCTION project
+    URL: https://bwixygkmogchzhjuhivt.supabase.co
+    Confirm this is production: YES / NO
+
+[ ] Pinecone: Verify using PRODUCTION API key
+    Environment: us-east-1
+    Confirm this is production: YES / NO
+
+[ ] Groq: Verify using PRODUCTION API key
+    Key starts with: gsk_kH19o...
+    Confirm this is production: YES / NO
+
+================================================================================
+3. INITIALIZATION SCRIPTS
+================================================================================
+
+Run each script and check for success:
+
+[ ] Download embedding models
+    Command: python3 scripts/download_models.py
+    Status: ___________________________________________
+
+[ ] Initialize database tables
+    Command: python3 scripts/init_database.py
+    Tables created: users, documents, chunk_labels, style_profiles, assistance_logs
+    Status: ___________________________________________
+
+[ ] Create Pinecone index
+    Command: python3 scripts/init_pinecone.py
+    Index name: cognitive-assistant
+    Dimension: 384
+    Status: ___________________________________________
+
+[ ] Setup Redis (optional)
+    Command: ./scripts/setup_redis.sh
+    OR: Accept rate limiting will be disabled
+    Status: ___________________________________________
+
+================================================================================
+4. SECURITY VERIFICATION
+================================================================================
+
+[ ] .env file permissions set to 600
+    Command: chmod 600 backend/.env
+
+[ ] .env files NOT committed to git
+    Command: git check-ignore backend/.env
+    Expected: .gitignore:2:.env backend/.env
+
+[ ] No service-role keys exposed (should use anon key only)
+    Verify SUPABASE_KEY is anon key, NOT service_role key
+
+[ ] SSL/TLS certificates installed (if deploying to domain)
+    Certificate path: ___________________________________________
+
+[ ] Firewall configured (production server only)
+    Ports open: 22 (SSH), 80 (HTTP), 443 (HTTPS)
+    Command: sudo ufw status
+
+================================================================================
+5. FRONTEND CONFIGURATION
+================================================================================
+
+[ ] Frontend .env file created
+    Location: /Users/saksham/Desktop/Cite/.env
+    Content: VITE_API_BASE_URL=https://api.yourdomain.com/api/v1
+
+[ ] Frontend built
+    Command: npm run build
+    Output directory exists: dist/
+
+[ ] Frontend deployed (if separate hosting)
+    URL: ___________________________________________
+
+================================================================================
+6. SERVER DEPLOYMENT
+================================================================================
+
+Choose deployment method:
+
+[ ] Option A: Direct server
+    Started with: gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+
+[ ] Option B: Docker
+    Built image: docker build -t cognitive-assistant:latest .
+    Running container: docker run -d --name cognitive-assistant -p 8000:8000 cognitive-assistant:latest
+
+[ ] Option C: Docker Compose
+    Started with: docker-compose up -d
+
+[ ] Option D: Systemd service (Linux)
+    Service file created: /etc/systemd/system/cognitive-assistant.service
+    Service enabled: sudo systemctl enable cognitive-assistant
+    Service started: sudo systemctl start cognitive-assistant
+
+[ ] Option E: Platform-as-a-Service
+    Platform: ___________________________________________
+    Deployment URL: ___________________________________________
+
+================================================================================
+7. REVERSE PROXY / LOAD BALANCER (if applicable)
+================================================================================
+
+[ ] Nginx/Apache configured
+    Config file: ___________________________________________
+    SSL certificate: ___________________________________________
+
+[ ] DNS configured
+    A/AAAA record: api.yourdomain.com -> ___________
+    A/AAAA record: www.yourdomain.com -> ___________
+
+================================================================================
+8. POST-DEPLOYMENT VERIFICATION
+================================================================================
+
+[ ] Health check passes
+    Command: curl https://api.yourdomain.com/health
+    Expected: {"status":"healthy","service":"cognitive-assistant"}
+
+[ ] Root endpoint accessible
+    Command: curl https://api.yourdomain.com/
+    Expected: {"service":"Cognitive Assistant API","version":"0.1.0"}
+
+[ ] Frontend loads
+    URL: https://yourdomain.com
+    Login modal appears: YES / NO
+
+[ ] User signup works
+    Created test user: ___________________________________________
+    Received auth token: YES / NO
+
+[ ] Document upload works
+    Uploaded test file: ___________________________________________
+    Processing status: ready / processing / failed
+
+[ ] AI assistance generates
+    Mode tested: START
+    Response time: _________ seconds (should be <3s)
+    Sources displayed: YES / NO
+
+[ ] Document list shows uploaded docs
+    Number of documents: _________
+
+[ ] Document deletion works
+    Deleted test document: YES / NO
+    Removed from database and vector store: YES / NO
+
+================================================================================
+9. MONITORING & LOGGING
+================================================================================
+
+[ ] Sentry receiving errors (if configured)
+    Test error sent: YES / NO / N/A
+    Visible in Sentry dashboard: YES / NO / N/A
+
+[ ] Logs accessible
+    Log location: ___________________________________________
+    Sample log entry visible: YES / NO
+
+[ ] Uptime monitoring configured (recommended)
+    Service: ___________________________________________
+    Endpoint: https://api.yourdomain.com/health
+    Alert email: ___________________________________________
+
+================================================================================
+10. PERFORMANCE & LOAD TESTING (optional but recommended)
+================================================================================
+
+[ ] Load test completed
+    Tool used: ___________________________________________
+    Concurrent users tested: _________
+    Average response time: _________ ms
+    Error rate: _________ %
+
+[ ] Memory usage stable
+    Initial: _________ MB
+    After 1 hour: _________ MB
+    Leak detected: YES / NO
+
+================================================================================
+11. BACKUP & RECOVERY
+================================================================================
+
+[ ] Database backup configured
+    Supabase auto-backup enabled: YES / NO
+    Manual backup tested: YES / NO
+
+[ ] Environment configuration backed up
+    Backup location: ___________________________________________
+
+[ ] Disaster recovery plan documented
+    Documented: YES / NO
+    Location: ___________________________________________
+
+================================================================================
+12. DOCUMENTATION & HANDOFF
+================================================================================
+
+[ ] README.md updated with production info
+[ ] DEPLOY.md reviewed
+[ ] PRODUCTION_DEPLOYMENT_CHECKLIST.md reviewed
+[ ] KNOWN_LIMITATIONS_AND_ROADMAP.md reviewed
+[ ] ACTUAL_COST_ANALYSIS.md reviewed
+[ ] Team briefed on deployment
+[ ] On-call rotation established (if applicable)
+
+================================================================================
+13. FINAL GO/NO-GO DECISION
+================================================================================
+
+Critical items (must all be YES):
+[ ] All security checks passed
+[ ] Health check returns 200 OK
+[ ] Authentication works
+[ ] Document upload works
+[ ] AI assistance generates responses
+[ ] No active security vulnerabilities
+[ ] Monitoring configured or accepted risk
+
+Nice-to-have items (recommended but not blocking):
+[ ] Redis configured for rate limiting
+[ ] Sentry configured for error tracking
+[ ] Load testing completed
+[ ] Backup strategy verified
+
+================================================================================
+DEPLOYMENT DECISION
+================================================================================
+
+Reviewed by: _________________
+Date: _________________
+Time: _________________
+
+Decision: [ ] GO - Ready for production launch
+          [ ] NO-GO - Issues must be resolved
+
+Issues blocking launch (if NO-GO):
+___________________________________________________________________________
+___________________________________________________________________________
+___________________________________________________________________________
+
+================================================================================
+POST-LAUNCH MONITORING (First 24 Hours)
+================================================================================
+
+Hour 1:  [ ] No errors / Issues: _______________________________________
+Hour 6:  [ ] No errors / Issues: _______________________________________
+Hour 12: [ ] No errors / Issues: _______________________________________
+Hour 24: [ ] No errors / Issues: _______________________________________
+
+Performance metrics (24 hours):
+- Uptime: _________ %
+- Average response time: _________ ms
+- Error rate: _________ %
+- Total requests: _________
+- Unique users: _________
+
+================================================================================
+NOTES
+================================================================================
+
+___________________________________________________________________________
+___________________________________________________________________________
+___________________________________________________________________________
+___________________________________________________________________________
+
+================================================================================

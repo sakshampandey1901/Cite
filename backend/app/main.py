@@ -19,6 +19,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize Sentry if DSN is provided
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            integrations=[
+                FastApiIntegration(),
+                SqlalchemyIntegration(),
+            ],
+            traces_sample_rate=0.1 if settings.ENVIRONMENT == "production" else 1.0,
+            profiles_sample_rate=0.1 if settings.ENVIRONMENT == "production" else 1.0,
+        )
+        logger.info("✅ Sentry initialized successfully")
+    except ImportError:
+        logger.warning("Sentry SDK not installed. Run: pip install sentry-sdk[fastapi]")
+    except Exception as e:
+        logger.error(f"Failed to initialize Sentry: {e}")
+else:
+    logger.info("Sentry monitoring disabled (no SENTRY_DSN configured)")
+
 # Create FastAPI app
 app = FastAPI(
     title="Cognitive Assistant API",

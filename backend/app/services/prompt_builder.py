@@ -5,6 +5,8 @@ from app.models.schemas import TaskMode, RetrievalResult, PromptComponents
 
 class PromptBuilder:
     """Constructs prompts with layered architecture for safety and determinism."""
+    MAX_SOURCE_CHARS = 1500
+    MAX_CONTEXT_CHARS = 8000
 
     # Layer 1: System Rules (Immutable)
     SYSTEM_RULES = """CRITICAL CONSTRAINTS (MANDATORY):
@@ -176,18 +178,27 @@ CRITICAL:
 You MUST acknowledge this limitation in your response."""
 
         context_parts = ["RETRIEVED SOURCES (ranked by relevance):\n"]
+        total_chars = 0
 
         for idx, source in enumerate(sources, start=1):
             location = f"page {source.metadata.page_number}" if source.metadata.page_number else \
                       f"timestamp {source.metadata.timestamp}" if source.metadata.timestamp else "unknown location"
+
+            content = source.content
+            if len(content) > self.MAX_SOURCE_CHARS:
+                content = content[: self.MAX_SOURCE_CHARS].rstrip() + " [truncated]"
 
             context_parts.append(f"""[Source {idx}]
 - Source: {source.metadata.source_filename} ({location})
 - Type: {source.metadata.content_type.value}
 - Role: {source.metadata.rhetorical_role.value}
 - Relevance Score: {source.similarity_score:.2f}
-- Content: \"{source.content}\"
+- Content: \"{content}\"
 """)
+            total_chars += len(content)
+            if total_chars >= self.MAX_CONTEXT_CHARS:
+                context_parts.append("[Additional sources omitted to keep prompt size within limits]")
+                break
 
         return "\n".join(context_parts)
 
