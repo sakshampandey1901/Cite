@@ -412,7 +412,7 @@ python -m app.main
 npm run dev
 
 # 6. Open browser
-open http://localhost:5173
+open 
 ```
 
 ### Run Tests
@@ -463,7 +463,4 @@ All deliverables meet or exceed the specified requirements with particular empha
 2. **Traceability**: All outputs cite sources
 3. **Safety**: Zero hallucination tolerance, no impersonation
 
-The system is ready for MVP deployment and has a clear path for post-MVP enhancements.
-
----
 
