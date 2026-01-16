@@ -1,12 +1,16 @@
 """Authentication API endpoints using Supabase Auth."""
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
-from app.core.supabase_client import supabase
+from app.core.config import settings
+from app.core.supabase_client import get_supabase_client
 from app.core.security import get_current_user_id
 from app.models.database import get_db, User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["authentication"])
 security = HTTPBearer()
@@ -51,11 +55,40 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     Returns access token for immediate use.
     """
     try:
+        # Get Supabase client (with error handling)
+        try:
+            supabase = get_supabase_client()
+        except ValueError as e:
+            logger.error(f"Supabase client configuration error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is not properly configured. Please contact support."
+            )
+        except Exception as e:
+            logger.error(f"Failed to get Supabase client: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is temporarily unavailable. Please try again later."
+            )
+        
         # Supabase handles password validation and hashing automatically
-        auth_response = supabase.auth.sign_up({
-            "email": request.email,
-            "password": request.password
-        })
+        try:
+            auth_response = supabase.auth.sign_up({
+                "email": request.email,
+                "password": request.password
+            })
+        except Exception as supabase_error:
+            error_str = str(supabase_error).lower()
+            logger.warning(f"Supabase signup error: {supabase_error}")
+            
+            # Handle network/connection errors
+            if "network" in error_str or "connection" in error_str or "timeout" in error_str:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Unable to connect to authentication service. Please check your internet connection and try again."
+                )
+            # Re-raise to be handled by outer exception handler
+            raise
 
         if not auth_response.user:
             raise HTTPException(
@@ -101,29 +134,44 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
             email=request.email
         )
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (already properly formatted)
+        raise
     except Exception as e:
-        error_message = str(e)
+        error_message = str(e).lower()
+        logger.error(f"Signup error: {e}", exc_info=True)
 
         # Handle common Supabase Auth errors
-        if "already registered" in error_message.lower() or "already exists" in error_message.lower():
+        if "already registered" in error_message or "already exists" in error_message or "user already registered" in error_message:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Email already registered. Please use a different email or try logging in."
             )
-        elif "password" in error_message.lower() and "short" in error_message.lower():
+        elif "password" in error_message and ("short" in error_message or "minimum" in error_message):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password must be at least 8 characters long"
             )
-        elif "invalid" in error_message.lower() and "email" in error_message.lower():
+        elif "invalid" in error_message and "email" in error_message:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email format"
+                detail="Invalid email format. Please enter a valid email address."
+            )
+        elif "network" in error_message or "connection" in error_message or "timeout" in error_message:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to connect to authentication service. Please check your internet connection and try again."
             )
         else:
+            # Don't expose internal error details in production
+            if settings.ENVIRONMENT == "development":
+                detail = f"Authentication error: {str(e)}"
+            else:
+                detail = "An error occurred during signup. Please try again or contact support if the problem persists."
+            
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Authentication error: {error_message}"
+                detail=detail
             )
 
 
@@ -138,11 +186,40 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     Returns access token managed by Supabase.
     """
     try:
+        # Get Supabase client (with error handling)
+        try:
+            supabase = get_supabase_client()
+        except ValueError as e:
+            logger.error(f"Supabase client configuration error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is not properly configured. Please contact support."
+            )
+        except Exception as e:
+            logger.error(f"Failed to get Supabase client: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is temporarily unavailable. Please try again later."
+            )
+        
         # Supabase handles password verification and hashing automatically
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
-        })
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": request.email,
+                "password": request.password
+            })
+        except Exception as supabase_error:
+            error_str = str(supabase_error).lower()
+            logger.warning(f"Supabase login error: {supabase_error}")
+            
+            # Handle network/connection errors
+            if "network" in error_str or "connection" in error_str or "timeout" in error_str:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Unable to connect to authentication service. Please check your internet connection and try again."
+                )
+            # Re-raise to be handled by outer exception handler
+            raise
 
         if not auth_response.user or not auth_response.session:
             raise HTTPException(
@@ -182,21 +259,34 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         )
 
     except HTTPException:
+        # Re-raise HTTP exceptions (already properly formatted)
         raise
     except Exception as e:
-        error_message = str(e)
+        error_message = str(e).lower()
+        logger.error(f"Login error: {e}", exc_info=True)
 
         # Handle common Supabase Auth errors
-        if "invalid" in error_message.lower() and ("credentials" in error_message.lower() or "login" in error_message.lower()):
+        if "invalid" in error_message and ("credentials" in error_message or "login" in error_message or "password" in error_message):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password",
+                detail="Incorrect email or password. Please check your credentials and try again.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        elif "network" in error_message or "connection" in error_message or "timeout" in error_message:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to connect to authentication service. Please check your internet connection and try again."
+            )
         else:
+            # Don't expose internal error details in production
+            if settings.ENVIRONMENT == "development":
+                detail = f"Authentication error: {str(e)}"
+            else:
+                detail = "An error occurred during login. Please try again or contact support if the problem persists."
+            
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Authentication error: {error_message}"
+                detail=detail
             )
 
 

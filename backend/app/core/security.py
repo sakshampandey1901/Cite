@@ -1,7 +1,10 @@
 """Security utilities for authentication and authorization using Supabase."""
+import logging
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.core.supabase_client import supabase
+from app.core.supabase_client import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 # HTTP Bearer token scheme
@@ -24,6 +27,9 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
     token = credentials.credentials
 
     try:
+        # Get Supabase client
+        supabase = get_supabase_client()
+        
         # Verify token with Supabase Auth
         user_response = supabase.auth.get_user(token)
 
@@ -36,7 +42,15 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
 
         return user_response.user.id
 
-    except Exception:
+    except ValueError as e:
+        # Supabase client configuration error
+        logger.error(f"Supabase client error in get_current_user_id: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is not available",
+        )
+    except Exception as e:
+        logger.warning(f"Token validation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",

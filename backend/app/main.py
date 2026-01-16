@@ -82,13 +82,15 @@ async def startup_event():
         if settings.ENVIRONMENT == "production":
             raise
 
-# CORS middleware
+# CORS middleware - configured for production and development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 

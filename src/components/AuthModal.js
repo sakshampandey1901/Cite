@@ -100,9 +100,24 @@ export class AuthModal {
       window.location.reload();
 
     } catch (error) {
-      this.showError(error.message || 'Authentication failed');
+      // Extract user-friendly error message
+      let errorMessage = 'Authentication failed';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.details && error.details.detail) {
+        errorMessage = error.details.detail;
+      } else if (error.details && typeof error.details === 'string') {
+        errorMessage = error.details;
+      }
+      
+      // Show error to user
+      this.showError(errorMessage);
       submitBtn.disabled = false;
       submitBtn.textContent = this.mode === 'login' ? 'Login' : 'Sign Up';
+      
+      // Log full error for debugging
+      console.error('Authentication error:', error);
     }
   }
 

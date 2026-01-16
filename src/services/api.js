@@ -71,9 +71,21 @@ class APIService {
       headers['Content-Type'] = 'application/json';
     }
 
+    // Create timeout controller if AbortController is available
+    let timeoutController = null;
+    if (typeof AbortController !== 'undefined' && !options.signal) {
+      timeoutController = new AbortController();
+      setTimeout(() => {
+        if (timeoutController) {
+          timeoutController.abort();
+        }
+      }, 30000); // 30 second timeout
+    }
+
     const config = {
       ...options,
       headers,
+      signal: options.signal || (timeoutController ? timeoutController.signal : undefined),
     };
 
     try {
@@ -81,7 +93,17 @@ class APIService {
 
       // Handle non-2xx responses
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        let errorData = {};
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await response.json();
+          } else {
+            errorData = { detail: `Server error: ${response.status} ${response.statusText}` };
+          }
+        } catch (parseError) {
+          errorData = { detail: `Server error: ${response.status} ${response.statusText}` };
+        }
 
         // Handle authentication errors (401 Unauthorized)
         if (response.status === 401) {
@@ -92,11 +114,15 @@ class APIService {
           }));
         }
 
-        throw new APIError(
-          errorData.detail || 'Request failed',
-          response.status,
-          errorData
-        );
+        // Provide user-friendly error messages
+        const errorMessage = errorData.detail || errorData.message || 
+          (response.status === 503 ? 'Service temporarily unavailable. Please try again later.' :
+           response.status === 500 ? 'Server error. Please try again or contact support.' :
+           response.status === 404 ? 'Requested resource not found.' :
+           response.status === 403 ? 'Access forbidden.' :
+           `Request failed with status ${response.status}`);
+
+        throw new APIError(errorMessage, response.status, errorData);
       }
 
       // Return JSON if content type is JSON
@@ -110,7 +136,37 @@ class APIService {
       if (error instanceof APIError) {
         throw error;
       }
-      throw new APIError('Network error', 0, { originalError: error.message });
+      
+      // Handle network errors with detailed messages
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        throw new APIError(
+          'Request timed out. Please check your internet connection and try again.',
+          0,
+          { originalError: error.message, type: 'timeout' }
+        );
+      }
+      
+      if (error.message && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('NetworkError') ||
+        error.message.includes('Network request failed')
+      )) {
+        throw new APIError(
+          `Cannot connect to server. Please check:
+1. Backend server is running (${this.baseURL})
+2. Your internet connection
+3. CORS settings if accessing from different domain`,
+          0,
+          { originalError: error.message, type: 'network' }
+        );
+      }
+      
+      // Generic error
+      throw new APIError(
+        `Network error: ${error.message || 'Unknown error'}. Please check your connection and try again.`,
+        0,
+        { originalError: error.message, type: 'unknown' }
+      );
     }
   }
 

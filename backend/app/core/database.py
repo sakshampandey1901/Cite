@@ -29,7 +29,13 @@ def validate_database_url(url: str) -> Tuple[bool, Optional[str]]:
         Tuple of (is_valid, error_message)
     """
     if not url:
-        return False, "DATABASE_URL is empty or not set"
+        error_msg = "DATABASE_URL is empty or not set"
+        logger.error(
+            "DATABASE_URL validation failed: %s (url=%s)",
+            error_msg,
+            _mask_password_in_url(url or ""),
+        )
+        return False, error_msg
     
     # Check if it's a PostgreSQL URL
     if not url.startswith(("postgresql://", "postgresql+psycopg2://", "postgres://")):
@@ -38,21 +44,43 @@ def validate_database_url(url: str) -> Tuple[bool, Optional[str]]:
     try:
         parsed = urlparse(url)
     except Exception as e:
-        return False, f"Invalid URL format: {str(e)}"
+        error_msg = f"Invalid URL format: {e}"
+        logger.error(
+            "DATABASE_URL validation failed: %s (url=%s)",
+            error_msg,
+            _mask_password_in_url(url),
+        )
+        return False, error_msg
     
+    if not parsed.hostname:
+        error_msg = "DATABASE_URL is missing a hostname"
+        logger.error(
+            "DATABASE_URL validation failed: %s (url=%s)",
+            error_msg,
+            _mask_password_in_url(url),
+        )
+        return False, error_msg
+
     # Check for Supabase connection
-    is_supabase = "supabase" in parsed.hostname.lower() if parsed.hostname else False
-    is_pooler = "pooler" in parsed.hostname.lower() if parsed.hostname else False
+    is_supabase = "supabase" in parsed.hostname.lower()
+    is_pooler = "pooler" in parsed.hostname.lower()
     
     if is_supabase and is_pooler:
-        # Pooler requires postgres.{project-ref} format
+        # Pooler requires postgres.{project_ref} format
         username = parsed.username or ""
         if not username.startswith("postgres."):
-            return False, (
-                "Supabase pooler connection requires username format: postgres.{project-ref}\n"
-                "Current username: {}\n"
+            error_msg = (
+                "Supabase pooler connection requires username format: "
+                "postgres.{project_ref}\n"
+                f"Current username: {username}\n"
                 "Fix: Get connection string from Supabase Dashboard → Settings → Database → Connection string"
-            ).format(username)
+            )
+            logger.error(
+                "DATABASE_URL validation failed: %s (url=%s)",
+                error_msg.replace("\n", " "),
+                _mask_password_in_url(url),
+            )
+            return False, error_msg
     
     # Check for SSL requirement (Supabase requires SSL)
     if is_supabase:
@@ -124,13 +152,28 @@ def create_database_engine(database_url: Optional[str] = None) -> Engine:
     # Validate URL
     is_valid, error_msg = validate_database_url(url)
     if not is_valid:
-        raise DatabaseConnectionError(
-            f"Invalid database URL configuration:\n{error_msg}\n\n"
+        error_details = (
+            "Invalid database URL configuration:\n"
+            f"{error_msg}\n\n"
             f"Current URL (masked): {_mask_password_in_url(url)}\n\n"
             "To fix:\n"
             "1. Go to Supabase Dashboard → Settings → Database\n"
             "2. Copy 'Connection string' (URI format)\n"
-            "3. Ensure it uses format: postgresql://postgres.{project-ref}:password@host:port/db?sslmode=require"
+            "3. Ensure it uses format: "
+            "postgresql://postgres.{project_ref}:password@host:port/db?sslmode=require"
+        )
+        logger.error(error_details)
+        if settings.ENVIRONMENT == "production":
+            raise DatabaseConnectionError(error_details)
+        logger.warning(
+            "Non-production environment detected; using in-memory SQLite engine "
+            "to allow application startup."
+        )
+        return create_engine(
+            "sqlite://",
+            pool_pre_ping=True,
+            echo=False,
+            connect_args={"check_same_thread": False},
         )
     
     # Normalize URL (add missing parameters)
@@ -213,13 +256,13 @@ def test_database_connection(engine: Engine, timeout: int = 10) -> Tuple[bool, O
             return False, (
                 "Connection failed: Tenant or user not found\n\n"
                 "This usually means:\n"
-                "1. Missing project reference in username (should be postgres.{project-ref} for pooler)\n"
+                "1. Missing project reference in username (should be postgres.{project_ref} for pooler)\n"
                 "2. Incorrect password\n"
                 "3. Database paused - check Supabase dashboard\n\n"
                 "Fix:\n"
                 "1. Go to Supabase Dashboard → Settings → Database\n"
                 "2. Copy the 'Connection string' (URI format)\n"
-                "3. Ensure username format: postgres.{project-ref} for pooler connections\n"
+                "3. Ensure username format: postgres.{project_ref} for pooler connections\n"
                 "4. Verify password is correct\n"
                 "5. Check if database is paused and wake it up if needed"
             )
