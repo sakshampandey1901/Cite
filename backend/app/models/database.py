@@ -32,6 +32,27 @@ class ContentTypeEnum(str, enum.Enum):
     UNKNOWN = "unknown"
 
 
+class RhetoricalRoleEnum(str, enum.Enum):
+    """Rhetorical role classification for content chunks."""
+    ARGUMENT = "argument"
+    EXAMPLE = "example"
+    BACKGROUND = "background"
+    CONCLUSION = "conclusion"
+    METHODOLOGY = "methodology"
+    INSIGHT = "insight"
+    OBSERVATION = "observation"
+    DEFINITION = "definition"
+    INSUFFICIENT_DATA = "insufficient_data"
+    UNKNOWN = "unknown"
+
+
+class ConfidenceLabelEnum(str, enum.Enum):
+    """Confidence level for label assignments."""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class User(Base):
     """User account model synced with Supabase Auth."""
     __tablename__ = "users"
@@ -102,6 +123,42 @@ class AssistanceLog(Base):
     retrieval_time_ms = Column(Integer, nullable=True)
     generation_time_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ChunkLabel(Base):
+    """Labeled content chunks with quality metadata for RAG enhancement."""
+    __tablename__ = "chunk_labels"
+
+    id = Column(String(36), primary_key=True)
+    chunk_id = Column(String(255), nullable=False, unique=True, index=True)  # Format: {user_id}_{document_id}_{chunk_index}
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    document_id = Column(String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+
+    # Content metadata
+    chunk_text = Column(Text, nullable=False)
+    token_count = Column(Integer, nullable=False)
+
+    # Source location
+    source_type = Column(SQLEnum(ContentTypeEnum), nullable=False)
+    page_number = Column(Integer, nullable=True)
+    timestamp = Column(String(50), nullable=True)
+
+    # Label assignments
+    rhetorical_role = Column(SQLEnum(RhetoricalRoleEnum), nullable=False)
+    topic_tags = Column(Text, nullable=True)  # JSON array stored as text: ["tag1", "tag2", "tag3"]
+
+    # Quality metadata
+    confidence_label = Column(SQLEnum(ConfidenceLabelEnum), nullable=False)
+    coverage_score = Column(Integer, nullable=False)  # 0-100
+
+    # Auto vs manual labeling
+    is_auto_labeled = Column(Boolean, default=True, nullable=False)
+    human_verified = Column(Boolean, default=False, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 # Database connection setup

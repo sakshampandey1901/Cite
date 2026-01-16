@@ -8,6 +8,7 @@ import logging
 from app.core.config import settings
 from app.api.routes import router
 from app.api.auth import router as auth_router
+from app.api.labeling import router as labeling_router
 from app.models.database import init_db, engine
 from app.core.database import test_database_connection, DatabaseConnectionError, get_connection_info
 
@@ -148,6 +149,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include API routes
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(router, prefix="/api/v1")
+app.include_router(labeling_router, prefix="/api/v1/labeling", tags=["labeling"])
 
 
 # Root endpoint

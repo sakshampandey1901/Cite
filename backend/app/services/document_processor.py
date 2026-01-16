@@ -1,10 +1,12 @@
 """Document processing service for ingestion pipeline."""
 import fitz  # PyMuPDF
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from pathlib import Path
 import tiktoken
+from sqlalchemy.orm import Session
 from app.models.schemas import ContentType, RhetoricalRole
+from app.services.chunk_labeling import ChunkLabelingService
 
 
 class DocumentChunk:
@@ -33,6 +35,7 @@ class DocumentProcessor:
 
     def __init__(self):
         self.encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
+        self.labeling_service = ChunkLabelingService()
 
     def process_pdf(self, file_path: Path) -> Tuple[List[DocumentChunk], ContentType]:
         """
@@ -231,3 +234,75 @@ class DocumentProcessor:
             return RhetoricalRole.BACKGROUND
         else:
             return RhetoricalRole.UNKNOWN
+
+    def process_and_label_chunks(
+        self,
+        chunks: List[DocumentChunk],
+        content_type: ContentType,
+        user_id: str,
+        document_id: str,
+        db: Optional[Session] = None,
+    ) -> List[DocumentChunk]:
+        """
+        Process chunks with enhanced labeling service and optionally save to DB.
+
+        This method:
+        1. Auto-labels each chunk using the ChunkLabelingService
+        2. Enriches chunk metadata with confidence scores and topic tags
+        3. Optionally saves labels to database for tracking and verification
+
+        Args:
+            chunks: List of DocumentChunks to process
+            content_type: Type of source document
+            user_id: User ID
+            document_id: Document ID
+            db: Optional database session for saving labels
+
+        Returns:
+            List of chunks with enriched metadata
+        """
+        for chunk in chunks:
+            # Auto-label the chunk
+            label_result = self.labeling_service.auto_label_chunk(
+                chunk_text=chunk.content,
+                source_type=content_type,
+                page_number=chunk.page_number,
+                timestamp=chunk.timestamp,
+            )
+
+            # Enrich chunk metadata with labeling results
+            chunk.metadata['rhetorical_role'] = label_result.rhetorical_role
+            chunk.metadata['topic_tags'] = label_result.topic_tags
+            chunk.metadata['confidence_label'] = label_result.confidence_label
+            chunk.metadata['coverage_score'] = label_result.coverage_score
+            chunk.metadata['token_count'] = label_result.token_count
+
+            # Optionally save to database for tracking and human verification
+            if db is not None:
+                try:
+                    chunk_id = f"{user_id}_{document_id}_{chunk.chunk_index}"
+                    self.labeling_service.save_label(
+                        db=db,
+                        chunk_id=chunk_id,
+                        user_id=user_id,
+                        document_id=document_id,
+                        chunk_index=chunk.chunk_index,
+                        chunk_text=chunk.content,
+                        source_type=content_type,
+                        rhetorical_role=label_result.rhetorical_role,
+                        topic_tags=label_result.topic_tags,
+                        token_count=label_result.token_count,
+                        confidence_label=label_result.confidence_label,
+                        coverage_score=label_result.coverage_score,
+                        page_number=chunk.page_number,
+                        timestamp=chunk.timestamp,
+                        is_auto_labeled=True,
+                        human_verified=False,
+                    )
+                except Exception as e:
+                    # Log error but don't fail the entire processing
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to save label for chunk {chunk.chunk_index}: {e}")
+
+        return chunks

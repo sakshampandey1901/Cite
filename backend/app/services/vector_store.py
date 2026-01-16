@@ -103,6 +103,17 @@ class VectorStore:
             if chunk.get('timestamp') is not None:
                 metadata['timestamp'] = chunk['timestamp']
 
+            # Add labeling metadata if available
+            if chunk.get('confidence_label') is not None:
+                metadata['confidence_label'] = chunk['confidence_label']
+            if chunk.get('coverage_score') is not None:
+                metadata['coverage_score'] = chunk['coverage_score']
+            if chunk.get('topic_tags') is not None and isinstance(chunk['topic_tags'], list):
+                # Pinecone supports list of strings
+                metadata['topic_tags'] = chunk['topic_tags']
+            if chunk.get('token_count') is not None:
+                metadata['token_count'] = chunk['token_count']
+
             vectors.append({
                 'id': chunk_id,
                 'values': embedding,
@@ -123,10 +134,12 @@ class VectorStore:
         user_id: str,
         top_k: int = 10,
         content_type_filter: Optional[str] = None,
-        rhetorical_role_filter: Optional[str] = None
+        rhetorical_role_filter: Optional[str] = None,
+        min_confidence: Optional[str] = None,
+        min_coverage_score: Optional[int] = None
     ) -> List[RetrievalResult]:
         """
-        Search for similar chunks.
+        Search for similar chunks with optional quality filters.
 
         Args:
             query: Search query
@@ -134,6 +147,8 @@ class VectorStore:
             top_k: Number of results to return
             content_type_filter: Optional content type filter
             rhetorical_role_filter: Optional rhetorical role filter
+            min_confidence: Optional minimum confidence level (high, medium, low)
+            min_coverage_score: Optional minimum coverage score (0-100)
 
         Returns:
             List of retrieval results
@@ -147,6 +162,11 @@ class VectorStore:
             filter_dict['content_type'] = content_type_filter
         if rhetorical_role_filter:
             filter_dict['rhetorical_role'] = rhetorical_role_filter
+        if min_confidence:
+            filter_dict['confidence_label'] = min_confidence
+        if min_coverage_score is not None:
+            # Pinecone supports numeric comparison filters
+            filter_dict['coverage_score'] = {'$gte': min_coverage_score}
 
         # Search
         results = self.index.query(

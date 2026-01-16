@@ -20,8 +20,19 @@ class RhetoricalRole(str, Enum):
     EXAMPLE = "example"
     BACKGROUND = "background"
     CONCLUSION = "conclusion"
+    METHODOLOGY = "methodology"
+    INSIGHT = "insight"
+    OBSERVATION = "observation"
     DEFINITION = "definition"
+    INSUFFICIENT_DATA = "insufficient_data"
     UNKNOWN = "unknown"
+
+
+class ConfidenceLabel(str, Enum):
+    """Confidence level for label assignments."""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
 class ContentType(str, Enum):
@@ -163,3 +174,102 @@ class PromptComponents(BaseModel):
     user_input: str
     output_format: str
     style_adaptation: Optional[str] = None
+
+
+# Chunk Labeling Schemas
+
+class ChunkLabelRequest(BaseModel):
+    """Request to label a chunk (manual override or auto-label)."""
+    chunk_id: str = Field(..., description="Unique chunk identifier")
+    rhetorical_role: RhetoricalRole = Field(..., description="Assigned rhetorical role")
+    topic_tags: Optional[List[str]] = Field(
+        default=None,
+        max_length=3,
+        description="Up to 3 topic tags derived from text"
+    )
+    confidence_label: ConfidenceLabel = Field(..., description="Confidence level")
+    coverage_score: int = Field(..., ge=0, le=100, description="Coverage percentage")
+    human_verified: bool = Field(default=False, description="Whether human verified")
+
+    @field_validator('topic_tags')
+    @classmethod
+    def validate_topic_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Ensure topic tags are non-empty and limited."""
+        if v is None:
+            return v
+        # Remove empty strings
+        filtered = [tag.strip() for tag in v if tag.strip()]
+        if len(filtered) > 3:
+            raise ValueError("Maximum 3 topic tags allowed")
+        return filtered[:3] if filtered else None
+
+
+class ChunkLabelResponse(BaseModel):
+    """Response after labeling a chunk."""
+    chunk_id: str
+    rhetorical_role: RhetoricalRole
+    topic_tags: Optional[List[str]]
+    token_count: int
+    confidence_label: ConfidenceLabel
+    coverage_score: int
+    is_auto_labeled: bool
+    human_verified: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class AutoLabelRequest(BaseModel):
+    """Request to auto-label chunk content."""
+    chunk_text: str = Field(..., max_length=50000, description="Text content of chunk")
+    source_type: ContentType = Field(..., description="Type of source document")
+    page_number: Optional[int] = Field(None, description="Page number if applicable")
+    timestamp: Optional[str] = Field(None, description="Timestamp if applicable")
+
+
+class AutoLabelResponse(BaseModel):
+    """Response from auto-labeling service."""
+    rhetorical_role: RhetoricalRole
+    topic_tags: Optional[List[str]]
+    token_count: int
+    confidence_label: ConfidenceLabel
+    coverage_score: int
+
+
+class ChunkLabelBatchRequest(BaseModel):
+    """Request to label multiple chunks at once."""
+    document_id: str = Field(..., description="Document ID to label chunks for")
+    labels: List[ChunkLabelRequest] = Field(..., description="List of chunk labels")
+
+
+class ChunkLabelBatchResponse(BaseModel):
+    """Response after batch labeling."""
+    document_id: str
+    labeled_count: int
+    failed_count: int
+    labels: List[ChunkLabelResponse]
+
+
+class UnlabeledChunksRequest(BaseModel):
+    """Request to get unlabeled chunks for a document."""
+    document_id: str = Field(..., description="Document ID")
+    limit: Optional[int] = Field(default=50, ge=1, le=200, description="Max chunks to return")
+    offset: Optional[int] = Field(default=0, ge=0, description="Offset for pagination")
+
+
+class UnlabeledChunkInfo(BaseModel):
+    """Information about an unlabeled chunk."""
+    chunk_id: str
+    chunk_index: int
+    chunk_text: str
+    token_count: int
+    page_number: Optional[int]
+    timestamp: Optional[str]
+    auto_labeled_role: Optional[RhetoricalRole] = None
+    auto_confidence: Optional[ConfidenceLabel] = None
+
+
+class UnlabeledChunksResponse(BaseModel):
+    """Response with unlabeled chunks."""
+    document_id: str
+    total_unlabeled: int
+    chunks: List[UnlabeledChunkInfo]
