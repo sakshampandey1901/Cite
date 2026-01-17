@@ -400,4 +400,4 @@ See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md#troubleshooting) for detai
 
 ## Contact
 
-[Add contact information]
+mail - pandeysaksham450@gmail.com
