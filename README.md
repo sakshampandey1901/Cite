@@ -39,46 +39,6 @@ An AI-powered personal cognitive assistant that learns from your uploaded docume
 
 ---
 
-## Quick Start
-
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Docker & Docker Compose
-- API Keys: Groq, Pinecone
-
-### Installation
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd cognitive-assistant
-
-# Backend setup
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env and add your API keys
-
-# Start dependencies
-docker-compose up -d
-
-# Run backend
-python -m app.main
-```
-
-```bash
-# Frontend setup (new terminal)
-npm install
-cp .env.example .env
-npm run dev
-```
-
-
----
-
 ## Architecture
 
 ### System Overview
