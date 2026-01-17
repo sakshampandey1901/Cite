@@ -83,6 +83,8 @@ npm run dev
 
 ### System Overview
 
+See `backend/ARCHITECTURE_DIAGRAM.md` for the detailed diagram and flow.
+
 ```
 ┌─────────────┐
 │   Frontend  │  Vanilla JS (planned: React)
@@ -194,67 +196,6 @@ The system is evaluated on:
 
 ---
 
-## API Documentation
-
-### POST /api/v1/documents/upload
-Upload a document for processing.
-
-**Request:**
-```bash
-curl -X POST http://localhost:8000/api/v1/documents/upload \
-  -H "Authorization: Bearer <token>" \
-  -F "file=@document.pdf"
-```
-
-**Response:**
-```json
-{
-  "document_id": "uuid",
-  "filename": "document.pdf",
-  "status": "ready",
-  "created_at": "2024-01-10T12:00:00"
-}
-```
-
-### POST /api/v1/assist
-Request cognitive assistance.
-
-**Request:**
-```json
-{
-  "mode": "START",
-  "editor_content": "I want to write about cognitive tools",
-  "additional_context": null
-}
-```
-
-**Response:**
-```json
-{
-  "guidance": "## START Guidance\n\n### 1. Likely Next Move\n...",
-  "sources": [
-    {
-      "source": "cognitive_science.pdf",
-      "page": 12,
-      "content_type": "research_paper",
-      "rhetorical_role": "argument",
-      "similarity_score": 0.89,
-      "content_preview": "..."
-    }
-  ],
-  "mode": "START",
-  "metadata": {
-    "retrieval_time_ms": 120,
-    "generation_time_ms": 1800,
-    "source_count": 3
-  }
-}
-```
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for complete API specification.
-
----
-
 ## Testing
 
 ### Run Security Tests
@@ -280,6 +221,7 @@ pytest tests/test_evaluation.py -v
 ## MVP Scope
 
 ### Included
+- User signup/login system
 - PDF/text document processing
 - 5 task modes
 - Vector-based semantic search
@@ -288,7 +230,6 @@ pytest tests/test_evaluation.py -v
 - Rate limiting
 
 ### Not Included (Post-MVP)
-- User registration/login system (auth stub only)
 - Video transcript processing (manual .srt upload only)
 - Real-time collaboration
 - Mobile app
@@ -307,23 +248,33 @@ pytest tests/test_evaluation.py -v
 │   │   ├── core/             # Config, security
 │   │   ├── models/           # Schemas, DB models
 │   │   ├── services/         # Business logic
-│   │   │   ├── document_processor.py
-│   │   │   ├── vector_store.py
-│   │   │   ├── prompt_builder.py
-│   │   │   └── llm_service.py
 │   │   └── main.py
+│   ├── docs/                 # Architecture assets
+│   ├── migrations/
 │   ├── tests/
-│   ├── requirements.txt
+│   ├── .env.example
+│   ├── ARCHITECTURE_DIAGRAM.md
+│   ├── DEPLOYMENT.md
 │   ├── Dockerfile
-│   └── docker-compose.yml
+│   ├── docker-compose.yml
+│   ├── requirements.txt
+│   └── start-backend.sh
+├── public/
+├── scripts/
 ├── src/
 │   ├── components/
 │   ├── services/
-│   │   └── api.js
-│   └── main.js
-├── ARCHITECTURE.md           # Detailed architecture
-├── IMPLEMENTATION_GUIDE.md   # Deployment guide
-└── README.md                 # This file
+│   ├── styles/
+│   ├── main.js
+│   └── style.css
+├── .env.example
+├── DELIVERABLES_SUMMARY.md
+├── DEPLOY.md
+├── IMPLEMENTATION_GUIDE.md
+├── QUICK-START.md
+├── SUPABASE-QUICK-START.md
+├── package.json
+└── README.md
 ```
 
 ---
@@ -345,17 +296,7 @@ pytest tests/test_evaluation.py -v
 
 ### Infrastructure
 - **Containerization**: Docker
-- **Deployment**: Cloud-agnostic (AWS/GCP/Azure)
-
----
-
-## Contributing
-
-### Development Workflow
-1. Create feature branch
-2. Implement with tests
-3. Run test suite
-4. Submit PR
+- **Deployment**: App hosting is cloud-agnostic; external services include Supabase, Pinecone, and Groq
 
 ### Code Standards
 - Python: PEP 8, type hints
@@ -365,36 +306,11 @@ pytest tests/test_evaluation.py -v
 
 ---
 
-## Troubleshooting
-
-See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md#troubleshooting) for detailed troubleshooting.
-
-**Common issues:**
-- Missing API keys → Add to `backend/.env`
-- CORS errors → Check `CORS_ORIGINS` setting
-- Database connection failed → Ensure PostgreSQL is running
-- File upload fails → Check file type and size
-
----
-
-## License
-
-[Specify your license]
-
----
-
 ## Acknowledgments
 
 - **Groq** for LLM inference
 - **Hugging Face** for local text embeddings
 - **Pinecone** for vector database
-
----
-
-## Documentation
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed system architecture
-- [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) - Deployment and usage guide
 
 ---
 
