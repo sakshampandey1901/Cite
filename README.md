@@ -83,7 +83,7 @@ npm run dev
 
 ### System Overview
 
-See `backend/ARCHITECTURE_DIAGRAM.md` for the detailed diagram and flow.
+![Cite workflow architecture diagram](backend/docs/architecture-diagram.png)
 
 ```
 ┌─────────────┐
