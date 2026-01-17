@@ -218,26 +218,6 @@ pytest tests/test_evaluation.py -v
 
 ---
 
-## MVP Scope
-
-### Included
-- User signup/login system
-- PDF/text document processing
-- 5 task modes
-- Vector-based semantic search
-- Source citation with transparency
-- Input validation and security
-- Rate limiting
-
-### Not Included (Post-MVP)
-- Video transcript processing (manual .srt upload only)
-- Real-time collaboration
-- Mobile app
-- OCR for scanned documents
-- Advanced style adaptation
-
----
-
 ## Project Structure
 
 ```
@@ -303,6 +283,26 @@ pytest tests/test_evaluation.py -v
 - JavaScript: ES6+, ESLint
 - Security: OWASP Top 10 compliance
 - Testing: pytest for backend
+
+---
+
+## MVP Scope
+
+### Included
+- User signup/login system
+- PDF/text document processing
+- 5 task modes
+- Vector-based semantic search
+- Source citation with transparency
+- Input validation and security
+- Rate limiting
+
+### Not Included (Post-MVP)
+- Video transcript processing (manual .srt upload only)
+- Real-time collaboration
+- Mobile app
+- OCR for scanned documents
+- Advanced style adaptation
 
 ---
 
