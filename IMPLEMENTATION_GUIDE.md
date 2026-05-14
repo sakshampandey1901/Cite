@@ -2,7 +2,6 @@
 
 This guide explains how to deploy and run Cite.
 
----
 
 ## Prerequisites
 

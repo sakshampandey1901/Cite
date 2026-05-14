@@ -1,6 +1,6 @@
 # Deliverables Summary
 
-This document provides a comprehensive overview of all deliverables for our AI-powered writing assistant system.
+This document provides a comprehensive overview of all deliverables for our AI-powered writing assistant' system.
 
 ---
 
