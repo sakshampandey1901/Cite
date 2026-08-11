@@ -1,6 +1,6 @@
 # Cite - AI-Powered Cognitive Assistant
 
-An AI-powered personal cognitive assistant that learns from your uploaded documents (PDFs, research papers, notes) to provide structured, thinking-aligned guidance during writing and problem-solving.
+An AI-powered personal cognitive assistant that learns from your uploaded documents (PDFs, research papers, notes) to provide structured, thinking-aligned guidance during writing and problem solving.
 
 **Core Philosophy**: Provide structured guidance, not final answers. Help users start, continue, reframe, or unblock their thinking without impersonating them or claiming to "think like" them.
 
